@@ -1,0 +1,13 @@
+# Compiled binaries
+dist/
+
+# Build artifacts
+buildenv_*
+
+# macOS
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~

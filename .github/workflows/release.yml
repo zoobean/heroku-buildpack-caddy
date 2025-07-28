@@ -1,0 +1,45 @@
+name: Build and Release Caddy
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Cross-compile Caddy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read Go version
+        id: go-version
+        run: |
+          if [[ -f .tool-versions ]]; then
+            GO_VERSION=$(grep '^golang' .tool-versions | awk '{print $2}')
+            if [[ -z "$GO_VERSION" ]]; then
+              GO_VERSION="1.21"
+            fi
+          else
+            GO_VERSION="1.21"
+          fi
+          echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+
+      - name: Build Caddy binaries
+        run: ./build.sh
+
+      - name: Upload Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for file in dist/*; do
+            filename=$(basename "$file")
+            echo "Uploading $filename..."
+            gh release upload ${{ github.event.release.tag_name }} "$file" --clobber
+          done

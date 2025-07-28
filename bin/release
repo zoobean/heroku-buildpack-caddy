@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -e
+
+BUILD_DIR=$1
+
+# Check if this is a Rails app
+if [[ -f "$BUILD_DIR/Gemfile" ]]; then
+    # For Rails apps, don't set default web process - let Rails buildpack handle it
+    # Caddy should be started via Procfile alongside Rails
+    cat << EOF
+---
+addons: []
+config_vars: {}
+EOF
+else
+    # For standalone Caddy apps, set default web process
+    cat << EOF
+---
+default_process_types:
+  web: caddy run --config Caddyfile --adapter caddyfile
+addons: []
+config_vars: {}
+EOF
+fi

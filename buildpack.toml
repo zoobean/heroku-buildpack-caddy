@@ -1,0 +1,21 @@
+[buildpack]
+id = "zoobean/caddy"
+name = "Caddy"
+version = "1.0.0"
+homepage = "https://github.com/zoobean/heroku-buildpack-caddy"
+
+[[buildpack.licenses]]
+type = "MIT"
+
+[metadata]
+description = "Heroku buildpack for Caddy web server with Cloudflare IP and WAF plugins"
+keywords = ["caddy", "web-server", "reverse-proxy", "waf", "cloudflare"]
+
+[[stacks]]
+id = "heroku-20"
+
+[[stacks]]
+id = "heroku-22"
+
+[[stacks]]
+id = "heroku-24"

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -e
+
+BUILD_DIR=$1
+
+# Check if Caddy configuration exists
+if [[ -f "$BUILD_DIR/Caddyfile" ]] || [[ -f "$BUILD_DIR/caddy.json" ]]; then
+    echo "Caddy"
+    exit 0
+fi
+
+# Check if Procfile mentions caddy
+if [[ -f "$BUILD_DIR/Procfile" ]] && grep -q "caddy" "$BUILD_DIR/Procfile"; then
+    echo "Caddy"
+    exit 0
+fi
+
+# Check for Rails app with Caddy config in subdirectory
+if [[ -f "$BUILD_DIR/Gemfile" ]] && [[ -f "$BUILD_DIR/config/caddy/Caddyfile" ]]; then
+    echo "Caddy"
+    exit 0
+fi
+
+# Check for any Caddyfile in config directory (common Rails pattern)
+if [[ -f "$BUILD_DIR/config/Caddyfile" ]]; then
+    echo "Caddy"
+    exit 0
+fi
+
+exit 1

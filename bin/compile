@@ -1,0 +1,97 @@
+#!/bin/bash
+
+set -e
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+BUILDPACK_DIR=$(cd "$(dirname "$0")" && cd .. && pwd)
+
+echo "-----> Installing Caddy for Rails integration"
+
+# Detect architecture
+ARCH=$(uname -m)
+case $ARCH in
+    x86_64)
+        CADDY_ARCH="amd64"
+        ;;
+    aarch64|arm64)
+        CADDY_ARCH="arm64"
+        ;;
+    *)
+        echo "ERROR: Unsupported architecture: $ARCH"
+        exit 1
+        ;;
+esac
+
+echo "       Detected architecture: $ARCH -> $CADDY_ARCH"
+
+# Determine version to download
+if [[ -f "$ENV_DIR/CADDY_VERSION" ]]; then
+    CADDY_VERSION=$(cat "$ENV_DIR/CADDY_VERSION")
+    echo "       Using specified version: $CADDY_VERSION"
+else
+    echo "       Fetching latest release version..."
+    CADDY_VERSION=$(curl -s "https://api.github.com/repos/zoobean/heroku-buildpack-caddy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    if [[ -z "$CADDY_VERSION" ]]; then
+        echo "ERROR: Could not determine latest version"
+        exit 1
+    fi
+    echo "       Using latest version: $CADDY_VERSION"
+fi
+
+# Create bin directory in build
+mkdir -p "$BUILD_DIR/bin"
+
+# Download the appropriate binary from GitHub releases
+BINARY_NAME="caddy-linux-$CADDY_ARCH"
+DOWNLOAD_URL="https://github.com/zoobean/heroku-buildpack-caddy/releases/download/$CADDY_VERSION/$BINARY_NAME"
+
+echo "       Downloading Caddy binary from: $DOWNLOAD_URL"
+
+if ! curl -sL "$DOWNLOAD_URL" -o "$BUILD_DIR/bin/caddy"; then
+    echo "ERROR: Failed to download Caddy binary from $DOWNLOAD_URL"
+    echo "       Please check that version $CADDY_VERSION exists and contains $BINARY_NAME"
+    exit 1
+fi
+
+chmod +x "$BUILD_DIR/bin/caddy"
+
+# Verify the downloaded binary works
+if ! "$BUILD_DIR/bin/caddy" version >/dev/null 2>&1; then
+    echo "ERROR: Downloaded Caddy binary is not executable or corrupted"
+    exit 1
+fi
+
+# Verify installation
+CADDY_VERSION=$("$BUILD_DIR/bin/caddy" version)
+echo "       Caddy installed successfully: $CADDY_VERSION"
+
+# Check for plugins
+echo "       Checking installed plugins..."
+PLUGINS=$("$BUILD_DIR/bin/caddy" list-modules | grep -E "(cloudflare|waf)" | wc -l)
+echo "       Security plugins installed: $PLUGINS"
+
+# Create profile.d script to add caddy to PATH
+mkdir -p "$BUILD_DIR/.profile.d"
+cat > "$BUILD_DIR/.profile.d/caddy.sh" << 'EOF'
+export PATH="$HOME/bin:$PATH"
+EOF
+
+# Check if this is a Rails app and provide helpful info
+if [[ -f "$BUILD_DIR/Gemfile" ]]; then
+    echo "       Rails app detected - Caddy will be available as reverse proxy/load balancer"
+    
+    # Look for Caddyfile locations
+    if [[ -f "$BUILD_DIR/config/Caddyfile" ]]; then
+        echo "       Found Caddyfile at: config/Caddyfile"
+    elif [[ -f "$BUILD_DIR/config/caddy/Caddyfile" ]]; then
+        echo "       Found Caddyfile at: config/caddy/Caddyfile"
+    elif [[ -f "$BUILD_DIR/Caddyfile" ]]; then
+        echo "       Found Caddyfile at: ./Caddyfile"
+    else
+        echo "       No Caddyfile found - you'll need to create one or specify via Procfile"
+    fi
+fi
+
+echo "-----> Caddy installation complete"
