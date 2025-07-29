@@ -1,6 +1,9 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    http-2 (1.1.1)
+    httpx (1.5.1)
+      http-2 (>= 1.0.0)
     minitest (5.25.5)
     rack (3.1.16)
     rack-test (2.2.0)
@@ -13,6 +16,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  httpx
   minitest
   rack
   rack-test
