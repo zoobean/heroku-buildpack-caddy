@@ -1,59 +1,19 @@
 # Test Caddyfile for Ruby/Rack app with Caddy WAF
 # Used for testing the heroku-buildpack-caddy
 {
-	debug
+	# debug
 	auto_https off
 	servers {
-		# use this ones
-		# 	"173.245.48.0/20",
-		# "103.21.244.0/22",
-		# "103.22.200.0/22",
-		# "103.31.4.0/22",
-		# "141.101.64.0/18",
-		# "108.162.192.0/18",
-		# "190.93.240.0/20",
-		# "188.114.96.0/20",
-		# "197.234.240.0/22",
-		# "198.41.128.0/17",
-		# "162.158.0.0/15",
-		# "104.16.0.0/13",
-		# "104.24.0.0/14",
-		# "172.64.0.0/13",
-		# "131.0.72.0/22",
-		# "2400:cb00::/32",
-		# "2606:4700::/32",
-		# "2803:f800::/32",
-		# "2405:b500::/32",
-		# "2405:8100::/32",
-		# "2a06:98c0::/29",
-		# "2c0f:f248::/32",
-		# # our ips
-		# "15.223.41.195/32",
-		trusted_proxies static {
-			173.245.48.0/20
-			103.21.244.0/22
-			103.22.200.0/22
-			103.31.4.0/22
-			141.101.64.0/18
-			108.162.192.0/18
-			190.93.240.0/20
-			188.114.96.0/20
-			197.234.240.0/22
-			198.41.128.0/17
-			162.158.0.0/15
-			104.16.0.0/13
-			104.24.0.0/14
-			172.64.0.0/13
-			131.0.72.0/22
-			2400:cb00::/32
-			2606:4700::/32
-			2803:f800::/32
-			2405:b500::/32
-			2405:8100::/32
-			2a06:98c0::/29
-			2c0f:f248::/32
-			15.223.41.195/32
+		trusted_proxies static 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 15.223.41.195/32
+		trusted_proxies_strict
+		protocols h1
+	}
+	log default {
+		output stdout
+		format console {
+			time_format iso8601
 		}
+		level WARN
 	}
 }
 
@@ -82,19 +42,22 @@
 			#     allowed_countries ["US", "CA", "GB"]
 			#     block_tor_exit_nodes true
 			# }
-			log_severity debug
 			anomaly_threshold 100
 		}
-	}
-
-	# Protected WAF metrics endpoint with basic auth from env variables
-	route /waf_metrics {
-		basic_auth {
-			admin $2a$10$example.hash.for.testing
+		@wafmetrics path /waf_metrics
+		handle @wafmetrics {
+			basic_auth {
+				admin {$WAF_ADMIN_PASS_HASH}
+			}
 		}
-		reverse_proxy localhost:{$RUBY_PORT} {
-			header_up Host {host}
-			header_up X-Real-IP {remote}
+
+		handle {
+			reverse_proxy localhost:{$RUBY_PORT} {
+				header_up Host {host}
+				header_up X-Real-IP {remote}
+				header_up X-Forwarded-Port {server_port}
+				header_up X-Forwarded-Proto "https"
+			}
 		}
 	}
 
@@ -121,62 +84,25 @@
 			header_up Host {host}
 			header_up X-Real-IP {remote}
 			header_up X-Forwarded-Port {server_port}
+			header_up X-Forwarded-Proto "https"
 		}
-	}
-
-	# Handle Rails packs (Webpacker/Vite assets) with caching
-	route /packs/* {
-		# Cache webpack/vite assets for 1 year
-		header Cache-Control "public, max-age=31536000, immutable"
-		header Expires "Thu, 31 Dec 2025 23:55:55 GMT"
-
-		root * public
-		try_files {path} {path}/
-		file_server
-	}
-
-	# Handle other static files with shorter cache
-	route /images/* {
-		# Cache other static files for 1 week
-		header Cache-Control "public, max-age=604800"
-
-		root * public
-		try_files {path} {path}/
-		file_server
-	}
-
-	route /stylesheets/* {
-		# Cache other static files for 1 week
-		header Cache-Control "public, max-age=604800"
-
-		root * public
-		try_files {path} {path}/
-		file_server
-	}
-
-	route /javascripts/* {
-		# Cache other static files for 1 week
-		header Cache-Control "public, max-age=604800"
-
-		root * public
-		try_files {path} {path}/
-		file_server
 	}
 
 	# Serve robots.txt, favicon.ico, etc. directly
-	route {
-		@static_files path /robots.txt /favicon.ico /apple-touch-icon* /android-chrome* /site.webmanifest
-		handle @static_files {
-			root * public
-			file_server
-		}
-	}
+	# route {
+	# 	@static_files path /robots.txt /favicon.ico /apple-touch-icon* /android-chrome* /site.webmanifest
+	# 	handle @static_files {
+	# 		root * public
+	# 		file_server
+	# 	}
+	# }
 
 	# Fallback to Ruby/Rack app for everything else
 	reverse_proxy localhost:{$RUBY_PORT} {
 		header_up Host {host}
 		header_up X-Real-IP {remote}
 		header_up X-Forwarded-Port {server_port}
+		header_up X-Forwarded-Proto "https"
 	}
 
 	# Security headers
@@ -197,10 +123,10 @@
 	# Logging to stdout (Heroku requirement)
 	log {
 		output stdout
-		format json {
+		format console {
 			time_format iso8601
 		}
-		level DEBUG
+		level WARN
 	}
 
 	# Error handling
