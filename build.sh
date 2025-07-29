@@ -34,9 +34,7 @@ fi
 targets=(
     "linux amd64 caddy-linux-amd64"
     "linux arm64 caddy-linux-arm64"
-    "darwin amd64 caddy-darwin-amd64"
     "darwin arm64 caddy-darwin-arm64"
-    "windows amd64 caddy-windows-amd64.exe"
 )
 
 for target in "${targets[@]}"; do
