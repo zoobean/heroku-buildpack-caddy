@@ -11,3 +11,4 @@ buildenv_*
 *.swp
 *.swo
 *~
+**/debug.json
