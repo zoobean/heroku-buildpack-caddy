@@ -32,7 +32,7 @@ if [[ -f "$ENV_DIR/CADDY_VERSION" ]]; then
     echo "       Using specified version: $CADDY_VERSION"
 else
     echo "       Fetching latest release version..."
-    CADDY_VERSION=$(curl -s "https://api.github.com/repos/yknx4/heroku-buildpack-caddy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    CADDY_VERSION=$(curl -s "https://api.github.com/repos/zoobean/heroku-buildpack-caddy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     if [[ -z "$CADDY_VERSION" ]]; then
         echo "ERROR: Could not determine latest version"
         exit 1
@@ -45,7 +45,7 @@ mkdir -p "$BUILD_DIR/bin"
 
 # Download the appropriate binary from GitHub releases
 BINARY_NAME="caddy-linux-$CADDY_ARCH"
-DOWNLOAD_URL="https://github.com/yknx4/heroku-buildpack-caddy/releases/download/$CADDY_VERSION/$BINARY_NAME"
+DOWNLOAD_URL="https://github.com/zoobean/heroku-buildpack-caddy/releases/download/$CADDY_VERSION/$BINARY_NAME"
 
 echo "       Downloading Caddy binary from: $DOWNLOAD_URL"
 
