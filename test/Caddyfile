@@ -1,0 +1,222 @@
+# Test Caddyfile for Ruby/Rack app with Caddy WAF
+# Used for testing the heroku-buildpack-caddy
+{
+	debug
+	auto_https off
+	servers {
+		# use this ones
+		# 	"173.245.48.0/20",
+		# "103.21.244.0/22",
+		# "103.22.200.0/22",
+		# "103.31.4.0/22",
+		# "141.101.64.0/18",
+		# "108.162.192.0/18",
+		# "190.93.240.0/20",
+		# "188.114.96.0/20",
+		# "197.234.240.0/22",
+		# "198.41.128.0/17",
+		# "162.158.0.0/15",
+		# "104.16.0.0/13",
+		# "104.24.0.0/14",
+		# "172.64.0.0/13",
+		# "131.0.72.0/22",
+		# "2400:cb00::/32",
+		# "2606:4700::/32",
+		# "2803:f800::/32",
+		# "2405:b500::/32",
+		# "2405:8100::/32",
+		# "2a06:98c0::/29",
+		# "2c0f:f248::/32",
+		# # our ips
+		# "15.223.41.195/32",
+		trusted_proxies static {
+			173.245.48.0/20
+			103.21.244.0/22
+			103.22.200.0/22
+			103.31.4.0/22
+			141.101.64.0/18
+			108.162.192.0/18
+			190.93.240.0/20
+			188.114.96.0/20
+			197.234.240.0/22
+			198.41.128.0/17
+			162.158.0.0/15
+			104.16.0.0/13
+			104.24.0.0/14
+			172.64.0.0/13
+			131.0.72.0/22
+			2400:cb00::/32
+			2606:4700::/32
+			2803:f800::/32
+			2405:b500::/32
+			2405:8100::/32
+			2a06:98c0::/29
+			2c0f:f248::/32
+			15.223.41.195/32
+		}
+	}
+}
+
+:{$PORT} {
+	# Set up trusted proxies for Cloudflare and local networks
+
+	# WAF Configuration with default settings
+	route {
+		waf {
+			# Basic WAF configuration
+			rule_file config/caddy/rules.json
+			# ip_blacklist_file config/caddy/ip_blacklist.txt
+			# dns_blacklist_file config/caddy/dns_blacklist.txt
+
+			# Metrics endpoint (protected by basic auth below)
+			metrics_endpoint /waf_metrics
+
+			# Rate limiting
+			# rate_limit {
+			# 	window 1m
+			# 	max_requests 100
+			# }
+
+			# Enable country blocking (requires GeoLite2 database)
+			# country_blocking {
+			#     allowed_countries ["US", "CA", "GB"]
+			#     block_tor_exit_nodes true
+			# }
+			log_severity debug
+			anomaly_threshold 100
+		}
+	}
+
+	# Protected WAF metrics endpoint with basic auth from env variables
+	route /waf_metrics {
+		basic_auth {
+			admin $2a$10$example.hash.for.testing
+		}
+		reverse_proxy localhost:{$RUBY_PORT} {
+			header_up Host {host}
+			header_up X-Real-IP {remote}
+		}
+	}
+
+	# Handle Rails assets with caching
+	route /assets/* {
+		# Cache responses from Rails for 1 year
+		cache {
+			ttl 1y
+			simplefs {
+				configuration {
+					size 10000
+					path /tmp/caddy_cache
+					directory_size 100MB
+				}
+			}
+		}
+
+		# Set cache headers for browsers/CDNs
+		header Cache-Control "public, max-age=31536000, immutable"
+		header Expires "Thu, 31 Dec 2025 23:55:55 GMT"
+
+		# Always proxy to Ruby/Rack app for assets
+		reverse_proxy localhost:{$RUBY_PORT} {
+			header_up Host {host}
+			header_up X-Real-IP {remote}
+			header_up X-Forwarded-Port {server_port}
+		}
+	}
+
+	# Handle Rails packs (Webpacker/Vite assets) with caching
+	route /packs/* {
+		# Cache webpack/vite assets for 1 year
+		header Cache-Control "public, max-age=31536000, immutable"
+		header Expires "Thu, 31 Dec 2025 23:55:55 GMT"
+
+		root * public
+		try_files {path} {path}/
+		file_server
+	}
+
+	# Handle other static files with shorter cache
+	route /images/* {
+		# Cache other static files for 1 week
+		header Cache-Control "public, max-age=604800"
+
+		root * public
+		try_files {path} {path}/
+		file_server
+	}
+
+	route /stylesheets/* {
+		# Cache other static files for 1 week
+		header Cache-Control "public, max-age=604800"
+
+		root * public
+		try_files {path} {path}/
+		file_server
+	}
+
+	route /javascripts/* {
+		# Cache other static files for 1 week
+		header Cache-Control "public, max-age=604800"
+
+		root * public
+		try_files {path} {path}/
+		file_server
+	}
+
+	# Serve robots.txt, favicon.ico, etc. directly
+	route {
+		@static_files path /robots.txt /favicon.ico /apple-touch-icon* /android-chrome* /site.webmanifest
+		handle @static_files {
+			root * public
+			file_server
+		}
+	}
+
+	# Fallback to Ruby/Rack app for everything else
+	reverse_proxy localhost:{$RUBY_PORT} {
+		header_up Host {host}
+		header_up X-Real-IP {remote}
+		header_up X-Forwarded-Port {server_port}
+	}
+
+	# Security headers
+	header {
+		# Remove server information
+		# -Server
+
+		# Security headers
+		# X-Content-Type-Options nosniff
+		# X-Frame-Options DENY
+		# X-XSS-Protection "1; mode=block"
+		# Referrer-Policy strict-origin-when-cross-origin
+
+		# HSTS (uncomment for HTTPS)
+		# Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+	}
+
+	# Logging to stdout (Heroku requirement)
+	log {
+		output stdout
+		format json {
+			time_format iso8601
+		}
+		level DEBUG
+	}
+
+	# Error handling
+	handle_errors {
+		@404 expression `{err.status_code} == 404`
+		handle @404 {
+			root * public
+			try_files /404.html
+			file_server
+		}
+
+		@500 expression `{err.status_code} >= 500`
+		handle @500 {
+			root * public
+			try_files /500.html
+			file_server
+		}
+	}
+}
