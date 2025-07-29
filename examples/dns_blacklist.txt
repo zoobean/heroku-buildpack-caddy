@@ -1,0 +1,13 @@
+# DNS/Domain Blacklist for Caddy WAF
+# Add one domain per line
+# Comments start with #
+
+# Example blocked domains (replace with actual malicious domains)
+# malicious-site.com
+# phishing-example.net
+# spam-domain.org
+
+# Block known malware/phishing domains
+# suspicious-download.com
+# fake-bank-login.net
+# malware-host.biz

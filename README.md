@@ -64,29 +64,58 @@ heroku buildpacks:add https://github.com/zoobean/heroku-buildpack-caddy
    - `config/caddy/Caddyfile`
    - `./Caddyfile` (project root)
 
-Example Rails `config/Caddyfile`:
+See the complete example in [`examples/rails-caddyfile`](examples/rails-caddyfile) with:
+- Asset caching (1 year for `/assets/*`, 1 week for others)
+- Cloudflare + local network trusted proxies  
+- WAF with default rules and basic auth protected UI
+- Security headers and error handling
+
+Basic Rails `config/Caddyfile`:
 
 ```caddyfile
 :$PORT
 
-# Proxy to Rails app running on port 3000
-reverse_proxy localhost:3000
+# Trusted proxies: Cloudflare + private networks
+trusted_proxies cloudflare { interval 12h }
+trusted_proxies static private_ranges
 
-# Enable Cloudflare IP detection
-trusted_proxies cloudflare {
-    interval 12h
+# WAF with basic configuration
+route {
+    waf {
+        rule_file config/caddy/rules.json
+        metrics_endpoint /waf_metrics
+    }
 }
 
-# WAF protection for Rails app
-waf {
-    ruleset_path "config/caddy/rules"
-    block_page "public/blocked.html"
-}
-
-# Serve static assets directly
-handle /assets/* {
+# Cache Rails assets
+route /assets/* {
+    header Cache-Control "public, max-age=31536000, immutable"
     root * public
+    try_files {path} @rails
     file_server
+}
+
+# Protected WAF metrics (basic auth from env vars)
+route /waf_metrics {
+    basicauth {
+        {$WAF_ADMIN_USER:admin} {$WAF_ADMIN_PASS_HASH}
+    }
+    reverse_proxy localhost:3000
+}
+
+# Main Rails app
+route @rails {
+    reverse_proxy localhost:3000 {
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# Heroku logging to stdout
+log {
+    output stdout
+    format json
 }
 ```
 

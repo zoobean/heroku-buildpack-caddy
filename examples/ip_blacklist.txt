@@ -1,0 +1,13 @@
+# IP Blacklist for Caddy WAF
+# Add one IP address or CIDR block per line
+# Comments start with #
+
+# Example blocked IPs (replace with actual threat IPs)
+# 192.168.1.100
+# 10.0.0.0/8
+# 172.16.0.0/12
+
+# Known malicious IP ranges (examples)
+# 103.224.182.0/24
+# 185.220.100.0/24
+# 198.98.51.0/24

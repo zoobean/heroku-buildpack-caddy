@@ -1,0 +1,50 @@
+{
+  "rules": [
+    {
+      "id": "001",
+      "description": "Block SQL injection attempts",
+      "pattern": "(?i)(union.*select|select.*from|insert.*into|delete.*from|drop.*table)",
+      "action": "block",
+      "severity": "high"
+    },
+    {
+      "id": "002", 
+      "description": "Block XSS attempts",
+      "pattern": "(?i)(<script|javascript:|on\\w+\\s*=)",
+      "action": "block",
+      "severity": "high"
+    },
+    {
+      "id": "003",
+      "description": "Block path traversal attempts", 
+      "pattern": "(\\.\\./|\\.\\.\\\\)",
+      "action": "block",
+      "severity": "medium"
+    },
+    {
+      "id": "004",
+      "description": "Block command injection attempts",
+      "pattern": "(?i)(;\\s*(rm|cat|ls|ps|kill|wget|curl)\\s|\\|\\s*(rm|cat|ls|ps|kill|wget|curl)\\s)",
+      "action": "block", 
+      "severity": "high"
+    },
+    {
+      "id": "005",
+      "description": "Rate limit login attempts",
+      "pattern": "(?i)/(login|signin|auth)",
+      "action": "rate_limit",
+      "rate_limit": {
+        "requests": 5,
+        "window": "1m"
+      },
+      "severity": "medium"
+    },
+    {
+      "id": "006",
+      "description": "Block known bad user agents",
+      "pattern": "(?i)(sqlmap|nmap|nikto|dirb|gobuster|wpscan)",
+      "action": "block",
+      "severity": "high"
+    }
+  ]
+}

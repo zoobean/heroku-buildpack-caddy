@@ -1,0 +1,150 @@
+# Example Caddyfile for Rails app with Caddy WAF and Cloudflare integration
+# Place this file at: config/Caddyfile in your Rails app
+
+:$PORT {
+    # Set up trusted proxies for Cloudflare and local networks
+    trusted_proxies cloudflare {
+        interval 12h
+    }
+    
+    # Add static trusted proxies for local/private networks
+    trusted_proxies static private_ranges
+
+    # WAF Configuration with default settings
+    route {
+        waf {
+            # Basic WAF configuration
+            rule_file config/caddy/rules.json
+            ip_blacklist_file config/caddy/ip_blacklist.txt
+            dns_blacklist_file config/caddy/dns_blacklist.txt
+            
+            # Metrics endpoint (protected by basic auth below)
+            metrics_endpoint /waf_metrics
+            
+            # Rate limiting
+            rate_limit {
+                window 1m
+                max_requests 100
+            }
+            
+            # Enable country blocking (requires GeoLite2 database)
+            # country_blocking {
+            #     allowed_countries ["US", "CA", "GB"]
+            #     block_tor_exit_nodes true
+            # }
+        }
+    }
+
+    # Protected WAF metrics endpoint with basic auth from env variables
+    route /waf_metrics {
+        basicauth {
+            {$WAF_ADMIN_USER:admin} {$WAF_ADMIN_PASS_HASH}
+        }
+        reverse_proxy localhost:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Handle Rails assets with caching
+    route /assets/* {
+        # Cache static assets for 1 year
+        header Cache-Control "public, max-age=31536000, immutable"
+        header Expires "Thu, 31 Dec 2025 23:55:55 GMT"
+        
+        # Try to serve from Rails public directory first
+        root * public
+        try_files {path} {path}/ @rails
+        file_server
+    }
+
+    # Handle Rails packs (Webpacker/Vite assets) with caching
+    route /packs/* {
+        # Cache webpack/vite assets for 1 year
+        header Cache-Control "public, max-age=31536000, immutable"
+        header Expires "Thu, 31 Dec 2025 23:55:55 GMT"
+        
+        root * public
+        try_files {path} {path}/ @rails
+        file_server
+    }
+
+    # Handle other static files with shorter cache
+    route /images/* /stylesheets/* /javascripts/* {
+        # Cache other static files for 1 week
+        header Cache-Control "public, max-age=604800"
+        
+        root * public
+        try_files {path} {path}/ @rails
+        file_server
+    }
+
+    # Serve robots.txt, favicon.ico, etc. directly
+    route /robots.txt /favicon.ico /apple-touch-icon* /android-chrome* /site.webmanifest {
+        root * public
+        file_server
+    }
+
+    # Main Rails application
+    route @rails {
+        reverse_proxy localhost:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Port {server_port}
+        }
+    }
+
+    # Fallback to Rails for everything else
+    reverse_proxy localhost:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Port {server_port}
+    }
+
+    # Security headers
+    header {
+        # Remove server information
+        -Server
+        
+        # Security headers
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        
+        # HSTS (uncomment for HTTPS)
+        # Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+
+    # Logging to stdout (Heroku requirement)
+    log {
+        output stdout
+        format json {
+            time_format iso8601
+        }
+        level INFO
+    }
+
+    # Error handling
+    handle_errors {
+        @404 expression `{err.status_code} == 404`
+        handle @404 {
+            root * public
+            try_files /404.html
+            file_server
+        }
+        
+        @500 expression `{err.status_code} >= 500`
+        handle @500 {
+            root * public
+            try_files /500.html
+            file_server
+        }
+    }
+}
