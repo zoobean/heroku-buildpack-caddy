@@ -44,9 +44,9 @@ for target in "${targets[@]}"; do
     echo "🏗️  Building for $goos/$goarch -> $output_name"
     
     CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" xcaddy build \
-        --with github.com/fabriziosalmi/caddy-waf \
-        --with github.com/darkweak/souin/plugins/caddy \
-        --with github.com/darkweak/storages/simplefs/caddy \
+        --with github.com/fabriziosalmi/caddy-waf@0ac97c5715346a962d11e466f98d46dc6f03169a \
+        --with github.com/darkweak/souin/plugins/caddy@v1.7.7 \
+        --with github.com/darkweak/storages/simplefs/caddy@v0.0.15 \
         --output "$output_path"
     
     if [[ -f "$output_path" ]]; then
