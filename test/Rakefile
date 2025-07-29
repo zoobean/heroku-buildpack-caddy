@@ -1,5 +1,7 @@
 require 'rake/testtask'
 
+ENV['WAF_ADMIN_PASS_HASH'] = '$2a$14$Q.ze0AzXam6HLyWSRiJTFeTQfV0u579gjUr/cXX4VWzKCna3xQynu'
+
 Rake::TestTask.new do |t|
   t.libs << "."
   t.test_files = FileList['test_*.rb']
