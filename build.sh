@@ -47,6 +47,7 @@ for target in "${targets[@]}"; do
         --with github.com/fabriziosalmi/caddy-waf@0ac97c5715346a962d11e466f98d46dc6f03169a \
         --with github.com/darkweak/souin/plugins/caddy@v1.7.7 \
         --with github.com/darkweak/storages/simplefs/caddy@v0.0.15 \
+        --with github.com/baldinof/caddy-supervisor@v0.7.0 \
         --output "$output_path"
     
     if [[ -f "$output_path" ]]; then
