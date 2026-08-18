@@ -76,14 +76,14 @@ while (( SECONDS - readiness_started_at < readiness_timeout_seconds )); do
   fi
 
   status_code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 0.20 "$readiness_url" 2>/dev/null) || status_code=''
-  if [[ "$status_code" == '200' ]]; then
+  if [[ "$status_code" =~ ^[123][0-9][0-9]$ ]]; then
     break
   fi
 
   sleep "$poll_interval_seconds"
 done
 
-if [[ "$status_code" != '200' ]]; then
+if [[ ! "$status_code" =~ ^[123][0-9][0-9]$ ]]; then
   echo "Backend readiness timed out after ${readiness_timeout_seconds} seconds" >&2
   terminate_process "$backend_pid"
   wait_for_process "$backend_pid" || true

@@ -11,8 +11,11 @@ case "${CADDY_TEST_CURL_MODE:-unavailable}" in
       printf '503'
     fi
     ;;
-  no_content)
-    printf '204'
+  redirect)
+    printf '301'
+    ;;
+  client_error)
+    printf '400'
     ;;
   unavailable)
     printf '000'

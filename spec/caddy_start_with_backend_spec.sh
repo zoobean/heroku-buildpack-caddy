@@ -33,7 +33,7 @@ Describe 'caddy-start-with-backend'
     The contents of file "$CADDY_TEST_EVENTS" should not include 'caddy_started'
   End
 
-  It 'waits for an exact HTTP 200 before starting Caddy'
+  It 'waits for a non-error HTTP response before starting Caddy'
     export CADDY_TEST_BACKEND_MODE=delayed_ready
     export CADDY_TEST_CURL_MODE=delayed_ready
     export CADDY_TEST_CADDY_MODE=exit
@@ -47,9 +47,20 @@ Describe 'caddy-start-with-backend'
     The contents of file "$CADDY_TEST_EVENTS" should include 'backend_term'
   End
 
-  It 'rejects successful statuses other than HTTP 200'
+  It 'accepts an HTTP redirect as ready'
+    export CADDY_TEST_BACKEND_MODE=wait
+    export CADDY_TEST_CURL_MODE=redirect
+    export CADDY_TEST_CADDY_MODE=exit
+
+    When run script "$script" 'http://127.0.0.1:3000/_up' -- fake-backend
+    The status should equal 29
+    The stdout should include 'Backend ready; starting Caddy'
+    The contents of file "$CADDY_TEST_EVENTS" should include 'caddy_started'
+  End
+
+  It 'rejects an HTTP client error'
     export CADDY_TEST_BACKEND_MODE=exit_before_ready
-    export CADDY_TEST_CURL_MODE=no_content
+    export CADDY_TEST_CURL_MODE=client_error
 
     When run script "$script" 'http://127.0.0.1:3000/_up' -- fake-backend
     The status should equal 23
