@@ -119,14 +119,24 @@ log {
 }
 ```
 
-3. Update your `Procfile` to run both Rails and Caddy:
+3. Signal readiness from Puma after it has booted:
+
+```ruby
+# config/puma.rb
+after_booted do
+  readiness_file = ENV["CADDY_BACKEND_READY_FILE"]
+  File.write(readiness_file, "") if readiness_file
+end
+```
+
+4. Update your `Procfile` to run both Rails and Caddy:
 
 ```
-web: caddy-start-with-backend http://127.0.0.1:3000/_up -- bundle exec puma -p 3000
+web: caddy-start-with-backend -- bundle exec puma -p 3000
 release: bundle exec rails db:migrate
 ```
 
-4. Deploy:
+5. Deploy:
 
 ```bash
 git push heroku main
@@ -173,8 +183,10 @@ web: caddy run --config caddy.json --adapter json
 **Rails apps** must define processes in `Procfile` to run both Rails and Caddy:
 
 ```
-web: caddy-start-with-backend http://127.0.0.1:3000/_up -- bundle exec puma -p 3000
+web: caddy-start-with-backend -- bundle exec puma -p 3000
 ```
+
+The Puma configuration must write `CADDY_BACKEND_READY_FILE` from its `after_booted` hook, as shown above.
 
 ## Development
 

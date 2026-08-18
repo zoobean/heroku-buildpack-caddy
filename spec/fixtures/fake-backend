@@ -3,6 +3,18 @@
 printf 'backend_started\n' >>"$CADDY_TEST_EVENTS"
 trap 'printf "backend_term\n" >>"$CADDY_TEST_EVENTS"; exit 0' TERM INT
 
+if [[ -z "${CADDY_BACKEND_READY_FILE:-}" ]]; then
+  printf 'backend_missing_ready_file\n' >>"$CADDY_TEST_EVENTS"
+  exit 65
+fi
+
+printf 'backend_received_ready_file\n' >>"$CADDY_TEST_EVENTS"
+
+mark_ready() {
+  : >"$CADDY_BACKEND_READY_FILE"
+  printf 'backend_ready\n' >>"$CADDY_TEST_EVENTS"
+}
+
 case "${CADDY_TEST_BACKEND_MODE:-wait}" in
   delayed_ready)
     sleep 0.3
@@ -10,15 +22,19 @@ case "${CADDY_TEST_BACKEND_MODE:-wait}" in
     if grep -q '^caddy_started$' "$CADDY_TEST_EVENTS"; then
       printf 'caddy_started_before_ready\n' >>"$CADDY_TEST_EVENTS"
     fi
-    touch "$CADDY_TEST_READY_FILE"
+    mark_ready
     ;;
   exit_before_ready)
     sleep 0.3
     exit 23
     ;;
   exit_after_ready)
+    mark_ready
     sleep 0.3
     exit 23
+    ;;
+  wait)
+    mark_ready
     ;;
 esac
 
