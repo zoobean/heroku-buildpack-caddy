@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+case "${CADDY_TEST_CURL_MODE:-unavailable}" in
+  ready)
+    printf '200'
+    ;;
+  delayed_ready)
+    if [[ -f "$CADDY_TEST_READY_FILE" ]]; then
+      printf '200'
+    else
+      printf '503'
+    fi
+    ;;
+  no_content)
+    printf '204'
+    ;;
+  unavailable)
+    printf '000'
+    exit 7
+    ;;
+esac
