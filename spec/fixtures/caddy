@@ -2,7 +2,7 @@
 
 case "$1" in
   run)
-    if [[ ! -f "$CADDY_TEST_READY_FILE" && "${CADDY_TEST_CURL_MODE:-}" == "delayed_ready" ]]; then
+    if [[ "${CADDY_TEST_BACKEND_MODE:-}" == "delayed_ready" ]] && ! grep -q '^backend_ready$' "$CADDY_TEST_EVENTS"; then
       printf 'caddy_started_before_ready\n' >>"$CADDY_TEST_EVENTS"
     fi
     printf 'caddy_started\n' >>"$CADDY_TEST_EVENTS"

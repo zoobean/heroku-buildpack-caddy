@@ -6,19 +6,35 @@ readonly readiness_timeout_seconds=45
 readonly poll_interval_seconds=0.25
 
 usage() {
-  echo "usage: caddy-start-with-backend <readiness-url> -- <backend-command...>" >&2
+  echo "usage: caddy-start-with-backend [<readiness-url>] -- <backend-command...>" >&2
 }
 
-if [[ $# -lt 3 || "$2" != "--" ]]; then
+if [[ $# -eq 1 && "$1" == "--supports-readiness-file" ]]; then
+  exit 0
+fi
+
+readiness_url=''
+
+if [[ $# -ge 2 && "$1" == "--" ]]; then
+  shift
+elif [[ $# -ge 3 && "$2" == "--" ]]; then
+  readiness_url=$1
+  shift 2
+else
   usage
   exit 64
 fi
 
-readiness_url=$1
-shift 2
-
 backend_pid=''
 caddy_pid=''
+readiness_directory=''
+readiness_file=''
+backend_ready=false
+
+cleanup_readiness_marker() {
+  [[ -n "$readiness_file" ]] && rm -f -- "$readiness_file"
+  [[ -n "$readiness_directory" ]] && rmdir -- "$readiness_directory" 2>/dev/null || true
+}
 
 process_is_running() {
   local process_state
@@ -62,8 +78,20 @@ handle_int() {
 
 trap handle_term TERM
 trap handle_int INT
+trap cleanup_readiness_marker EXIT
 
-"$@" &
+if [[ -z "$readiness_url" ]]; then
+  readiness_directory=$(mktemp -d) || {
+    echo "Unable to create backend readiness directory" >&2
+    exit 70
+  }
+  readiness_file="$readiness_directory/ready"
+
+  CADDY_BACKEND_READY_FILE="$readiness_file" "$@" &
+else
+  "$@" &
+fi
+
 backend_pid=$!
 
 echo "Waiting for backend readiness"
@@ -75,15 +103,21 @@ while (( SECONDS - readiness_started_at < readiness_timeout_seconds )); do
     exit $?
   fi
 
-  status_code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 0.20 "$readiness_url" 2>/dev/null) || status_code=''
-  if [[ "$status_code" =~ ^[123][0-9][0-9]$ ]]; then
+  if [[ -n "$readiness_url" ]]; then
+    status_code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 0.20 "$readiness_url" 2>/dev/null) || status_code=''
+    [[ "$status_code" =~ ^[123][0-9][0-9]$ ]] && backend_ready=true
+  elif [[ -f "$readiness_file" ]]; then
+    backend_ready=true
+  fi
+
+  if [[ "$backend_ready" == true ]]; then
     break
   fi
 
   sleep "$poll_interval_seconds"
 done
 
-if [[ ! "$status_code" =~ ^[123][0-9][0-9]$ ]]; then
+if [[ "$backend_ready" != true ]]; then
   echo "Backend readiness timed out after ${readiness_timeout_seconds} seconds" >&2
   terminate_process "$backend_pid"
   wait_for_process "$backend_pid" || true

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 script, signal = ARGV
-pid = Process.spawn(script, 'http://127.0.0.1:3000/_up', '--', 'fake-backend')
+pid = Process.spawn(script, '--', 'fake-backend')
 deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
 
 loop do
