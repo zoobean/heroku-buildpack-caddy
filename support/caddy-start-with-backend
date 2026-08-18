@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+
+set -u
+
+readonly readiness_timeout_seconds=45
+readonly poll_interval_seconds=0.25
+
+usage() {
+  echo "usage: caddy-start-with-backend <readiness-url> -- <backend-command...>" >&2
+}
+
+if [[ $# -lt 3 || "$2" != "--" ]]; then
+  usage
+  exit 64
+fi
+
+readiness_url=$1
+shift 2
+
+backend_pid=''
+caddy_pid=''
+
+process_is_running() {
+  local process_state
+
+  process_state=$(ps -p "$1" -o stat= 2>/dev/null) || return 1
+  [[ -n "$process_state" && "$process_state" != *Z* ]]
+}
+
+terminate_process() {
+  local pid=$1
+
+  if [[ -n "$pid" ]] && process_is_running "$pid"; then
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
+}
+
+wait_for_process() {
+  local pid=$1
+
+  [[ -n "$pid" ]] || return 0
+  wait "$pid" 2>/dev/null
+}
+
+stop_children() {
+  trap - TERM INT
+  terminate_process "$caddy_pid"
+  terminate_process "$backend_pid"
+  wait_for_process "$caddy_pid" || true
+  wait_for_process "$backend_pid" || true
+}
+
+handle_term() {
+  stop_children
+  exit 143
+}
+
+handle_int() {
+  stop_children
+  exit 130
+}
+
+trap handle_term TERM
+trap handle_int INT
+
+"$@" &
+backend_pid=$!
+
+echo "Waiting for backend readiness"
+readiness_started_at=$SECONDS
+
+while (( SECONDS - readiness_started_at < readiness_timeout_seconds )); do
+  if ! process_is_running "$backend_pid"; then
+    wait_for_process "$backend_pid"
+    exit $?
+  fi
+
+  status_code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 0.20 "$readiness_url" 2>/dev/null) || status_code=''
+  if [[ "$status_code" == '200' ]]; then
+    break
+  fi
+
+  sleep "$poll_interval_seconds"
+done
+
+if [[ "$status_code" != '200' ]]; then
+  echo "Backend readiness timed out after ${readiness_timeout_seconds} seconds" >&2
+  terminate_process "$backend_pid"
+  wait_for_process "$backend_pid" || true
+  exit 124
+fi
+
+if ! process_is_running "$backend_pid"; then
+  wait_for_process "$backend_pid"
+  exit $?
+fi
+
+echo "Backend ready; starting Caddy"
+caddy run --config config/Caddyfile --adapter caddyfile &
+caddy_pid=$!
+
+while true; do
+  if ! process_is_running "$backend_pid"; then
+    wait_for_process "$backend_pid"
+    child_status=$?
+    terminate_process "$caddy_pid"
+    wait_for_process "$caddy_pid" || true
+    exit "$child_status"
+  fi
+
+  if ! process_is_running "$caddy_pid"; then
+    wait_for_process "$caddy_pid"
+    child_status=$?
+    terminate_process "$backend_pid"
+    wait_for_process "$backend_pid" || true
+    exit "$child_status"
+  fi
+
+  sleep "$poll_interval_seconds"
+done

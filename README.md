@@ -122,7 +122,7 @@ log {
 3. Update your `Procfile` to run both Rails and Caddy:
 
 ```
-web: bundle exec puma -p 3000 & caddy run --config config/Caddyfile --adapter caddyfile
+web: caddy-start-with-backend http://127.0.0.1:3000/_up -- bundle exec puma -p 3000
 release: bundle exec rails db:migrate
 ```
 
@@ -173,7 +173,7 @@ web: caddy run --config caddy.json --adapter json
 **Rails apps** must define processes in `Procfile` to run both Rails and Caddy:
 
 ```
-web: bundle exec puma -p 3000 & caddy run --config config/Caddyfile
+web: caddy-start-with-backend http://127.0.0.1:3000/_up -- bundle exec puma -p 3000
 ```
 
 ## Development

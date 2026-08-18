@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+case "$1" in
+  run)
+    if [[ ! -f "$CADDY_TEST_READY_FILE" && "${CADDY_TEST_CURL_MODE:-}" == "delayed_ready" ]]; then
+      printf 'caddy_started_before_ready\n' >>"$CADDY_TEST_EVENTS"
+    fi
+    printf 'caddy_started\n' >>"$CADDY_TEST_EVENTS"
+    trap 'printf "caddy_term\n" >>"$CADDY_TEST_EVENTS"; exit 0' TERM INT
+
+    if [[ "${CADDY_TEST_CADDY_MODE:-exit}" == "exit" ]]; then
+      sleep 0.1
+      exit 29
+    fi
+
+    while true; do
+      sleep 0.1
+    done
+    ;;
+esac
+
+exit 64

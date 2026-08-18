@@ -57,6 +57,10 @@ fi
 
 chmod +x "$BUILD_DIR/bin/caddy"
 
+# Install the readiness-gated Rails startup command
+cp "$BUILDPACK_DIR/support/caddy-start-with-backend" "$BUILD_DIR/bin/caddy-start-with-backend"
+chmod +x "$BUILD_DIR/bin/caddy-start-with-backend"
+
 # Verify the downloaded binary works
 if ! "$BUILD_DIR/bin/caddy" version >/dev/null 2>&1; then
     echo "ERROR: Downloaded Caddy binary is not executable or corrupted"
