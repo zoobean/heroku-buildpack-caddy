@@ -46,6 +46,31 @@ Describe 'caddy-start-with-backend'
     The contents of file "$CADDY_TEST_EVENTS" should include 'backend_term'
   End
 
+  It 'supports the legacy readiness URL and accepts a non-error HTTP response'
+    export CADDY_TEST_BACKEND_MODE=wait
+    export CADDY_TEST_CURL_MODE=redirect
+    export CADDY_TEST_CADDY_MODE=exit
+    export CADDY_TEST_LEGACY_MODE=true
+
+    When run script "$script" 'http://127.0.0.1:3000/_up' -- fake-backend
+    The status should equal 29
+    The stdout should include 'Backend ready; starting Caddy'
+    The contents of file "$CADDY_TEST_EVENTS" should include 'backend_missing_ready_file'
+    The contents of file "$CADDY_TEST_EVENTS" should include 'caddy_started'
+  End
+
+  It 'supports the legacy readiness URL and rejects an HTTP error'
+    export CADDY_TEST_BACKEND_MODE=exit_before_ready
+    export CADDY_TEST_CURL_MODE=client_error
+    export CADDY_TEST_LEGACY_MODE=true
+
+    When run script "$script" 'http://127.0.0.1:3000/_up' -- fake-backend
+    The status should equal 23
+    The stdout should include 'Waiting for backend readiness'
+    The contents of file "$CADDY_TEST_EVENTS" should include 'backend_missing_ready_file'
+    The contents of file "$CADDY_TEST_EVENTS" should not include 'caddy_started'
+  End
+
   It 'terminates Caddy when the backend exits after readiness'
     export CADDY_TEST_BACKEND_MODE=exit_after_ready
     export CADDY_TEST_CADDY_MODE=wait

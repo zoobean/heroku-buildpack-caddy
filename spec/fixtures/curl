@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+case "${CADDY_TEST_CURL_MODE:-unavailable}" in
+  ready)
+    printf '200'
+    ;;
+  redirect)
+    printf '301'
+    ;;
+  client_error)
+    printf '400'
+    ;;
+  unavailable)
+    printf '000'
+    exit 7
+    ;;
+esac

@@ -188,6 +188,14 @@ web: caddy-start-with-backend -- bundle exec puma -p 3000
 
 The Puma configuration must write `CADDY_BACKEND_READY_FILE` from its `after_booted` hook, as shown above.
 
+For rollback compatibility with releases using HTTP readiness, the previous command form remains supported:
+
+```
+web: caddy-start-with-backend http://127.0.0.1:3000/_up -- bundle exec puma -p 3000
+```
+
+The legacy form treats HTTP 1xx, 2xx, and 3xx responses as ready. New deployments should use the readiness-file form.
+
 ## Development
 
 ### Building and Releasing

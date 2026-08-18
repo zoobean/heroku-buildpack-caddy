@@ -5,12 +5,13 @@ trap 'printf "backend_term\n" >>"$CADDY_TEST_EVENTS"; exit 0' TERM INT
 
 if [[ -z "${CADDY_BACKEND_READY_FILE:-}" ]]; then
   printf 'backend_missing_ready_file\n' >>"$CADDY_TEST_EVENTS"
-  exit 65
+  [[ "${CADDY_TEST_LEGACY_MODE:-false}" == "true" ]] || exit 65
+else
+  printf 'backend_received_ready_file\n' >>"$CADDY_TEST_EVENTS"
 fi
 
-printf 'backend_received_ready_file\n' >>"$CADDY_TEST_EVENTS"
-
 mark_ready() {
+  [[ -n "${CADDY_BACKEND_READY_FILE:-}" ]] || return
   : >"$CADDY_BACKEND_READY_FILE"
   printf 'backend_ready\n' >>"$CADDY_TEST_EVENTS"
 }
