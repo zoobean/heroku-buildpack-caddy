@@ -21,6 +21,13 @@ Describe 'caddy-start-with-backend'
     The stderr should include 'usage:'
   End
 
+  It 'reports readiness file support without starting a process'
+    When run script "$script" --supports-readiness-file
+    The status should equal 0
+    The output should equal ''
+    The contents of file "$CADDY_TEST_EVENTS" should equal ''
+  End
+
   It 'does not start Caddy when the backend exits before readiness'
     export CADDY_TEST_BACKEND_MODE=exit_before_ready
 
