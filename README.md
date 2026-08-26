@@ -9,7 +9,10 @@ A Heroku buildpack for deploying [Caddy](https://caddyserver.com/) web server ap
 - **Security plugins included**:
   - [caddy-cloudflare-ip](https://github.com/WeidiDeng/caddy-cloudflare-ip) - Real client IP detection behind Cloudflare
   - [caddy-waf](https://github.com/fabriziosalmi/caddy-waf) - Web Application Firewall middleware
-- **Latest Caddy version**: Built with Go 1.24.5 and Caddy v2.10.0
+- **Caching and process plugins included**:
+  - [Souin](https://github.com/darkweak/souin) with [simplefs storage](https://github.com/darkweak/storages) - HTTP response caching
+  - [caddy-supervisor](https://github.com/baldinof/caddy-supervisor) - Supervised process management
+- **Current Caddy version**: Built with Go 1.26.4 and Caddy v2.11.4
 
 ## Usage
 
@@ -18,19 +21,26 @@ A Heroku buildpack for deploying [Caddy](https://caddyserver.com/) web server ap
 1. Create a `Caddyfile` in your project root:
 
 ```caddyfile
-:$PORT
-
-root * public
-file_server
-
 # Enable Cloudflare IP detection
-trusted_proxies cloudflare {
-    interval 12h
+{
+    servers {
+        trusted_proxies cloudflare {
+            interval 12h
+        }
+        trusted_proxies_strict
+    }
 }
 
-# Enable WAF protection (optional)
-waf {
-    ruleset_path "/path/to/rules"
+:{$PORT} {
+    root * public
+    file_server
+
+    # Enable WAF protection (optional)
+    route {
+        waf {
+            rule_file "/path/to/rules.json"
+        }
+    }
 }
 ```
 
@@ -66,56 +76,56 @@ heroku buildpacks:add https://github.com/zoobean/heroku-buildpack-caddy
 
 See the complete example in [`examples/rails-caddyfile`](examples/rails-caddyfile) with:
 - Asset caching (1 year for `/assets/*`, 1 week for others)
-- Cloudflare + local network trusted proxies  
+- Cloudflare trusted proxies
 - WAF with default rules and basic auth protected UI
 - Security headers and error handling
 
 Basic Rails `config/Caddyfile`:
 
 ```caddyfile
-:$PORT
-
-# Trusted proxies: Cloudflare + private networks
-trusted_proxies cloudflare { interval 12h }
-trusted_proxies static private_ranges
-
-# WAF with basic configuration
-route {
-    waf {
-        rule_file config/caddy/rules.json
-        metrics_endpoint /waf_metrics
+{
+    servers {
+        trusted_proxies cloudflare { interval 12h }
+        trusted_proxies_strict
     }
 }
 
-# Cache Rails assets
-route /assets/* {
-    header Cache-Control "public, max-age=31536000, immutable"
-    root * public
-    try_files {path} @rails
-    file_server
-}
-
-# Protected WAF metrics (basic auth from env vars)
-route /waf_metrics {
-    basicauth {
-        {$WAF_ADMIN_USER:admin} {$WAF_ADMIN_PASS_HASH}
+:{$PORT} {
+    # WAF with basic configuration
+    route {
+        waf {
+            rule_file config/caddy/rules.json
+            metrics_endpoint /waf_metrics
+        }
     }
-    reverse_proxy localhost:3000
-}
 
-# Main Rails app
-route @rails {
+    # Cache Rails assets
+    route /assets/* {
+        header Cache-Control "public, max-age=31536000, immutable"
+        root * public
+        file_server
+    }
+
+    # Protected WAF metrics (basic auth from env vars)
+    route /waf_metrics {
+        basic_auth {
+            {$WAF_ADMIN_USER:admin} {$WAF_ADMIN_PASS_HASH}
+        }
+        reverse_proxy localhost:3000
+    }
+
+    # Main Rails app
     reverse_proxy localhost:3000 {
         header_up X-Real-IP {remote}
         header_up X-Forwarded-For {remote}
         header_up X-Forwarded-Proto {scheme}
     }
-}
 
-# Heroku logging to stdout
-log {
-    output stdout
-    format json
+    # Heroku logging to stdout
+    log {
+        output stdout
+        format json
+    }
 }
 ```
 
@@ -216,7 +226,7 @@ git tag v1.0.0
 git push origin v1.0.0
 
 # Create release and upload binaries
-gh release create v1.0.0 dist/* --title "Release v1.0.0" --notes "Caddy v2.10.0 with security plugins"
+gh release create v1.0.0 dist/* --title "Release v1.0.0" --notes "Caddy v2.11.4 with security, caching, and supervisor plugins"
 ```
 
 The buildpack will automatically download from the latest release.

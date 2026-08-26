@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'rack'
-gem 'minitest'
+gem 'minitest', '~> 6.0'
 gem 'webrick'
 gem 'rake'
 gem 'rack-test'
