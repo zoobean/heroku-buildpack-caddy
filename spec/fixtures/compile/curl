@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+output=''
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == '-o' ]]; then
+    output=$2
+    break
+  fi
+  shift
+done
+
+cp "$CADDY_TEST_BINARY" "$output"

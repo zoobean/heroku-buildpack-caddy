@@ -170,6 +170,7 @@ The buildpack automatically:
 - Detects your platform architecture (ARM64/x64)
 - Downloads the appropriate Caddy binary from GitHub releases
 - Installs Caddy binary with security plugins
+- Validates a discovered app Caddyfile during the build and fails on invalid configuration
 - Adds Caddy to your app's PATH
 - For standalone apps: Sets up a default web process type
 - For Rails apps: Leaves process management to Rails buildpack

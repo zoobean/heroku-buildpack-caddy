@@ -82,20 +82,40 @@ cat > "$BUILD_DIR/.profile.d/caddy.sh" << 'EOF'
 export PATH="$HOME/bin:$PATH"
 EOF
 
+# Find the app's Caddyfile using the same supported location precedence as detection.
+CADDYFILE=''
+if [[ -f "$BUILD_DIR/config/Caddyfile" ]]; then
+    CADDYFILE='config/Caddyfile'
+elif [[ -f "$BUILD_DIR/config/caddy/Caddyfile" ]]; then
+    CADDYFILE='config/caddy/Caddyfile'
+elif [[ -f "$BUILD_DIR/Caddyfile" ]]; then
+    CADDYFILE='Caddyfile'
+fi
+
+if [[ -n "$CADDYFILE" ]]; then
+    echo "       Found Caddyfile at: $CADDYFILE"
+    echo "       Validating Caddyfile..."
+    if ! (
+        for env_file in "$ENV_DIR"/*; do
+            [[ -f "$env_file" ]] || continue
+            env_name=${env_file##*/}
+            [[ "$env_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+            export "$env_name=$(cat "$env_file")"
+        done
+        cd "$BUILD_DIR"
+        bin/caddy validate --config "$CADDYFILE" --adapter caddyfile
+    ); then
+        echo "ERROR: Caddyfile validation failed: $CADDYFILE" >&2
+        exit 1
+    fi
+    echo "       Caddyfile is valid"
+elif [[ -f "$BUILD_DIR/Gemfile" ]]; then
+    echo "       No Caddyfile found - you'll need to create one or specify via Procfile"
+fi
+
 # Check if this is a Rails app and provide helpful info
 if [[ -f "$BUILD_DIR/Gemfile" ]]; then
     echo "       Rails app detected - Caddy will be available as reverse proxy/load balancer"
-    
-    # Look for Caddyfile locations
-    if [[ -f "$BUILD_DIR/config/Caddyfile" ]]; then
-        echo "       Found Caddyfile at: config/Caddyfile"
-    elif [[ -f "$BUILD_DIR/config/caddy/Caddyfile" ]]; then
-        echo "       Found Caddyfile at: config/caddy/Caddyfile"
-    elif [[ -f "$BUILD_DIR/Caddyfile" ]]; then
-        echo "       Found Caddyfile at: ./Caddyfile"
-    else
-        echo "       No Caddyfile found - you'll need to create one or specify via Procfile"
-    fi
 fi
 
 echo "-----> Caddy installation complete"
