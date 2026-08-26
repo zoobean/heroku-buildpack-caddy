@@ -68,7 +68,7 @@ jobs:
         with:
           repository: shellspec/shellspec
           ref: 0.28.1
-          path: .shellspec
+          path: .shellspec-bin
           persist-credentials: false
 
       - name: Build Caddy binaries
@@ -80,7 +80,7 @@ jobs:
           dist/caddy-linux-amd64 list-modules --skip-standard
 
       - name: Run buildpack ShellSpec
-        run: .shellspec/shellspec spec
+        run: .shellspec-bin/shellspec spec
 
       - name: Run Minitest
         run: bundle exec rake test
