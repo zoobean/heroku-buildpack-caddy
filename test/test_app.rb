@@ -22,7 +22,7 @@ class TestApp < Minitest::Test
   end
 
   def test_caddy_validate
-    result = system("../dist/caddy-darwin-arm64 validate --config Caddyfile")
+    result = system(caddy_binary, 'validate', '--config', 'Caddyfile')
     assert result, "Caddy validation failed"
   end
 

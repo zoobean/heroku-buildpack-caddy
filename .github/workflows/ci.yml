@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: runs-on=${{ github.run_id }}/runner=2cpu-linux-x64/spot=false/extras=s3-cache
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CADDY_BINARY: ../dist/caddy-linux-amd64
+
+    steps:
+      - name: Set up RunsOn Magic Cache
+        uses: runs-on/action@46910bf61b41721b0579f237e186afb35477007a # v2.3.0
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read tool versions
+        id: tool-versions
+        run: |
+          echo "go=$(awk '$1 == "golang" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
+          echo "ruby=$(awk '$1 == "ruby" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.tool-versions.outputs.go }}
+          cache: false
+
+      - name: Resolve Go cache paths
+        id: go-cache
+        run: |
+          echo "module=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Go build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.module }}
+            ${{ steps.go-cache.outputs.build }}
+          key: caddy-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.tool-versions.outputs.go }}-${{ hashFiles('build.sh') }}
+          restore-keys: |
+            caddy-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.tool-versions.outputs.go }}-
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.ruby }}
+          bundler-cache: true
+          working-directory: test
+
+      - name: Checkout ShellSpec
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: shellspec/shellspec
+          ref: 0.28.1
+          path: .shellspec
+          persist-credentials: false
+
+      - name: Build Caddy binaries
+        run: ./build.sh
+
+      - name: Verify embedded versions
+        run: |
+          go version -m dist/caddy-linux-amd64
+          dist/caddy-linux-amd64 list-modules --skip-standard
+
+      - name: Run ShellSpec
+        run: .shellspec/shellspec
+
+      - name: Run Minitest
+        run: bundle exec rake test
+        working-directory: test
