@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+case "$1" in
+  version)
+    echo 'v-test'
+    ;;
+  list-modules)
+    echo 'http.handlers.waf'
+    ;;
+  validate)
+    printf '%s\n' "$*" >>"$CADDY_TEST_EVENTS"
+    config=''
+    while [[ $# -gt 0 ]]; do
+      if [[ "$1" == '--config' ]]; then
+        config=$2
+        break
+      fi
+      shift
+    done
+    if grep -q '^invalid$' "$config"; then
+      echo 'invalid Caddyfile' >&2
+      exit 1
+    fi
+    if grep -q '^require-env WAF_ADMIN_PASS_HASH$' "$config"; then
+      if [[ -z "${WAF_ADMIN_PASS_HASH:-}" ]]; then
+        echo 'missing required environment' >&2
+        exit 1
+      fi
+      echo 'required environment present' >>"$CADDY_TEST_EVENTS"
+    fi
+    ;;
+  *)
+    exit 64
+    ;;
+esac
