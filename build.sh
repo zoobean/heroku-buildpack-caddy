@@ -4,6 +4,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/dist"
+CADDY_VERSION="v2.11.4"
+XCADDY_VERSION="v0.4.7"
 
 # Read Go version from .tool-versions file
 if [[ -f "${SCRIPT_DIR}/.tool-versions" ]]; then
@@ -25,10 +27,13 @@ if ! command -v go &> /dev/null; then
     exit 1
 fi
 
-if ! command -v xcaddy &> /dev/null; then
-    echo "📦 Installing xcaddy..."
-    go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+echo "📦 Installing xcaddy ${XCADDY_VERSION}..."
+go install "github.com/caddyserver/xcaddy/cmd/xcaddy@${XCADDY_VERSION}"
+GO_BIN="$(go env GOBIN)"
+if [[ -z "$GO_BIN" ]]; then
+    GO_BIN="$(go env GOPATH)/bin"
 fi
+XCADDY="$GO_BIN/xcaddy"
 
 # Build targets: goos goarch output_name
 targets=(
@@ -43,10 +48,11 @@ for target in "${targets[@]}"; do
     
     echo "🏗️  Building for $goos/$goarch -> $output_name"
     
-    CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" xcaddy build \
-        --with github.com/fabriziosalmi/caddy-waf@0ac97c5715346a962d11e466f98d46dc6f03169a \
-        --with github.com/darkweak/souin/plugins/caddy@v1.7.7 \
-        --with github.com/darkweak/storages/simplefs/caddy@v0.0.15 \
+    CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" "$XCADDY" build "$CADDY_VERSION" \
+        --with github.com/WeidiDeng/caddy-cloudflare-ip@f53b62aa13cb7ad79c8b47aacc3f2f03989b67e5 \
+        --with github.com/fabriziosalmi/caddy-waf@v0.4.1 \
+        --with github.com/darkweak/souin/plugins/caddy@v1.7.8 \
+        --with github.com/darkweak/storages/simplefs/caddy@v0.0.19 \
         --with github.com/baldinof/caddy-supervisor@v0.7.0 \
         --output "$output_path"
     

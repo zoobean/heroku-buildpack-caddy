@@ -45,7 +45,6 @@ caddy hash-password --plaintext yourpassword
 
 ### Security
 - **Cloudflare Integration**: Trusted proxies with 12h refresh
-- **Local Network Trust**: Private IP ranges trusted
 - **WAF Protection**: SQL injection, XSS, path traversal, command injection
 - **Rate Limiting**: Login endpoints protected
 - **Security Headers**: XSS protection, content type sniffing prevention
@@ -103,9 +102,12 @@ Edit `config/caddy/rules.json` to add custom rules:
 ```json
 {
   "id": "007",
+  "phase": 1,
   "description": "Block specific endpoint",
   "pattern": "/admin/secret",
-  "action": "block",
+  "targets": ["URI"],
+  "mode": "block",
+  "score": 10,
   "severity": "high"
 }
 ```

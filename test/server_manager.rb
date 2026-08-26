@@ -3,6 +3,10 @@ require 'httpx'
 require 'webrick'
 
 module ServerManager
+  def caddy_binary
+    ENV.fetch('CADDY_BINARY', '../dist/caddy-darwin-arm64')
+  end
+
   def self.find_available_port
     server = TCPServer.new('127.0.0.1', 0)
     port = server.addr[1]
@@ -67,7 +71,7 @@ module ServerManager
         ENV['PORT'] = @caddy_port.to_s
         ENV['RUBY_PORT'] = @ruby_port.to_s
         @caddy_server_ready = true
-        system("../dist/caddy-darwin-arm64 run --config Caddyfile --adapter caddyfile")
+        system(caddy_binary, 'run', '--config', 'Caddyfile', '--adapter', 'caddyfile')
       rescue => e
         puts "Caddy server failed to start: #{e.message}" unless @shutdown_requested
       end

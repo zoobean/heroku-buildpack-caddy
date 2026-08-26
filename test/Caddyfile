@@ -34,7 +34,7 @@
 			# Rate limiting
 			# rate_limit {
 			# 	window 1m
-			# 	max_requests 100
+			# 	requests 100
 			# }
 
 			# Enable country blocking (requires GeoLite2 database)

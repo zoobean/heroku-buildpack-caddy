@@ -7,29 +7,46 @@ on:
 jobs:
   build:
     name: Cross-compile Caddy
-    runs-on: ubuntu-latest
+    runs-on: runs-on=${{ github.run_id }}/runner=2cpu-linux-x64/spot=false/extras=s3-cache
+    timeout-minutes: 30
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Set up RunsOn Magic Cache
+        uses: runs-on/action@46910bf61b41721b0579f237e186afb35477007a # v2.3.0
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Read Go version
         id: go-version
         run: |
-          if [[ -f .tool-versions ]]; then
-            GO_VERSION=$(grep '^golang' .tool-versions | awk '{print $2}')
-            if [[ -z "$GO_VERSION" ]]; then
-              GO_VERSION="1.21"
-            fi
-          else
-            GO_VERSION="1.21"
-          fi
-          echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$(awk '$1 == "golang" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ steps.go-version.outputs.version }}
+          cache: false
+
+      - name: Resolve Go cache paths
+        id: go-cache
+        run: |
+          echo "module=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Go build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.go-cache.outputs.module }}
+            ${{ steps.go-cache.outputs.build }}
+          key: caddy-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-version.outputs.version }}-${{ hashFiles('build.sh') }}
+          restore-keys: |
+            caddy-go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-version.outputs.version }}-
 
       - name: Build Caddy binaries
         run: ./build.sh
